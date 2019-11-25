@@ -1,0 +1,26 @@
+[package]
+name = "singular"
+version = "0.1.0"
+authors = ["etwyniel <etwyniel@gmail.com>"]
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib",  "rlib"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+default = ["console_error_panic_hook"]
+
+[dependencies]
+rand = { version = "0.7", features = ["getrandom"] }
+getrandom = { version = "0.1", features = ["wasm-bindgen"] }
+wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
+wasm-bindgen-futures = "0.4.5"
+serde = "1"
+serde_derive = "1"
+console_error_panic_hook = { version = "0.1.1", optional = true }
+
+[profile.release]
+debug = true
+opt-level = "s"
