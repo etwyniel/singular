@@ -7,15 +7,17 @@ use serde_derive::Serialize;
 #[derive(Debug, Serialize)]
 pub struct Player {
     name: Option<String>,
-    hand: Vec<Card>,
+    id: u32,
+    pub(crate) hand: Vec<Card>,
 }
 
 #[wasm_bindgen]
 impl Player {
     #[wasm_bindgen(constructor)]
-    pub fn new(name: &str) -> Self {
+    pub fn new(name: &str, id: u32) -> Self {
         Player {
             name: Some(name.to_string()),
+            id,
             hand: Vec::new(),
         }
     }
@@ -28,6 +30,16 @@ impl Player {
     #[wasm_bindgen(getter)]
     pub fn name(&self) -> String {
         self.name.clone().unwrap_or_default()
+    }
+
+    #[wasm_bindgen(setter)]
+    pub fn set_id(&mut self, id: u32) {
+        self.id = id;
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn id(&self) -> u32 {
+        self.id
     }
 
     pub fn draw(&mut self, card: Card) {
@@ -44,6 +56,7 @@ impl Default for Player {
     fn default() -> Self {
         Player {
             name: None,
+            id: 0,
             hand: Vec::new(),
         }
     }

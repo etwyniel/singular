@@ -50,11 +50,11 @@ pub enum CardType {
 use CardType::*;
 
 impl CardType {
-    pub fn compatible_with(self, last: CardType) -> bool {
-        self.is_wild() || self == last
+    pub fn compatible_with(&self, last: CardType) -> bool {
+        self.is_wild() || *self == last
     }
 
-    pub fn is_wild(self) -> bool {
+    pub fn is_wild(&self) -> bool {
         match self {
             Wild | PlusFour => true,
             _ => false,
@@ -90,13 +90,35 @@ impl CardType {
         }
         PlusFour
     }
+
+    pub fn can_be_stacked(&self) -> bool {
+        match self {
+            PlusTwo | PlusFour | Reverse | Skip => true,
+            _ => false,
+        }
+    }
+
+    pub fn display(&self) -> String {
+        match *self {
+            n if *self as u8 <= 9 => format!("{}", n as u8),
+            PlusFour => "+4".to_string(),
+            PlusTwo => "+2".to_string(),
+            Wild => "*".to_string(),
+            _ => format!("{:?}", self),
+        }
+        // if *self as u8 <= 9 {
+        //     format!("{}", *self as u8)
+        // } else {
+        //     format!("{:?}", self)
+        // }
+    }
 }
 
 #[wasm_bindgen]
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Deserialize, Serialize)]
 pub struct Card {
     ty: CardType,
-    color: Color,
+    pub(crate) color: Color,
 }
 
 impl Card {
@@ -110,20 +132,26 @@ impl Card {
 
 #[wasm_bindgen]
 impl Card {
-    pub fn compatible_with(self, other: Card) -> bool {
+    pub fn compatible_with(&self, other: Card) -> bool {
         self.ty.compatible_with(other.ty) || self.color == other.color
     }
 
-    pub fn color(self) -> Color {
+    #[wasm_bindgen(getter)]
+    pub fn color(&self) -> Color {
         self.color
     }
 
-    pub fn is_wild(self) -> bool {
+    pub fn is_wild(&self) -> bool {
         self.ty.is_wild()
     }
 
-    pub fn ty(self) -> CardType {
+    #[wasm_bindgen(getter)]
+    pub fn ty(&self) -> CardType {
         self.ty
+    }
+
+    pub fn display_ty(&self) -> String {
+        self.ty.display()
     }
 
     #[wasm_bindgen(constructor)]
@@ -131,8 +159,18 @@ impl Card {
         value.into_serde().unwrap()
     }
 
-    pub fn display(self) -> String {
+    pub fn display(&self) -> String {
         format!("{}", self)
+    }
+
+    pub fn display_alt(&self) -> String {
+        format!("{:#}", self)
+    }
+}
+
+impl Default for Card {
+    fn default() -> Self {
+        Card { ty: CardType::N0, color: Color::Red }
     }
 }
 
@@ -145,8 +183,46 @@ impl Display for Card {
             Skip => write!(f, "{:?} skip", self.color),
             Reverse => write!(f, "{:?} reverse", self.color),
             number => write!(f, "{:?} {}", self.color, number as u8),
+        }?;
+        if f.alternate() && self.is_wild() {
+            write!(f, " ({:?})", self.color)?;
         }
+        Ok(())
     }
+}
+
+/// Builds a sorted deck
+pub fn build_deck() -> Vec<Card> {
+    use Color::*;
+    use CardType::*;
+    let mut deck = Vec::with_capacity(108);
+    for color in vec![Red, Green, Yellow, Blue] {
+        deck.push(Card { ty: N0, color });
+        let mut push_two = |ty| {
+            let c = Card { ty, color };
+            deck.push(c);
+            deck.push(c);
+        };
+        push_two(N1);
+        push_two(N2);
+        push_two(N3);
+        push_two(N4);
+        push_two(N5);
+        push_two(N6);
+        push_two(N7);
+        push_two(N8);
+        push_two(N9);
+        push_two(PlusTwo);
+        push_two(Skip);
+        push_two(Reverse);
+    }
+
+    for _ in 0..4 {
+        // Using Red as a placeholder
+        deck.push(Card { ty: Wild, color: Red });
+        deck.push(Card { ty: PlusFour, color: Red });
+    }
+    deck
 }
 
 #[test]
