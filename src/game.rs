@@ -91,6 +91,7 @@ impl Game {
         self.draw.shuffle(&mut self.rng);
         self.discard.clear();
         self.last = self.draw.pop().unwrap();
+        self.current_player = 0;
     }
 
     #[wasm_bindgen(getter)]

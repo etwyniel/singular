@@ -2,3 +2,5 @@
 **/*.rs.bk
 node_modules
 dist
+static/singular.js
+static/singular_bg.wasm
