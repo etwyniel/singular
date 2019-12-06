@@ -9,6 +9,7 @@ RUN cargo vendor > .cargo/config
 RUN cargo build --target wasm32-unknown-unknown --release
 
 COPY ./src src
+RUN touch src/lib.rs
 COPY ./static static
 
 RUN cargo build --target wasm32-unknown-unknown --release
