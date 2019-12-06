@@ -1,10 +1,10 @@
-FROM rust AS wasm-build
+sFROM rust AS wasm-build
 
 RUN rustup target install wasm32-unknown-unknown && cargo install wasm-bindgen-cli
 WORKDIR /usr/src/app
 COPY Cargo.lock .
 COPY Cargo.toml .
-RUN mkdir .cargo
+RUN mkdir .cargo && mkdir src && touch src/lib.rs
 RUN cargo vendor > .cargo/config
 RUN cargo build --target wasm32-unknown-unknown --release
 
@@ -19,11 +19,11 @@ FROM rust as lobbier-build
 RUN git clone https://github.com/etwyniel/lobbier
 RUN cd lobbier && cargo install --path .
 ARG CACHE_DATE
-RUN echo $CACHE_DATE && git pull && cargo install --path .
+RUN echo $CACHE_DATE && cd lobbier && git pull && cargo install --path . --force
 
 FROM debian:stable-slim
 
 COPY --from=lobbier-build /usr/local/cargo/bin/lobbier /bin
-COPY --from=wasm-build static .
+COPY --from=wasm-build /usr/src/app/static static
 
 CMD ["lobbier"]
