@@ -1,4 +1,4 @@
-sFROM rust AS wasm-build
+FROM rust AS wasm-build
 
 RUN rustup target install wasm32-unknown-unknown && cargo install wasm-bindgen-cli
 WORKDIR /usr/src/app
