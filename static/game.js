@@ -241,7 +241,7 @@ function wild_select_color(i, card) {
 
 function try_play(card, start = null) {
   let src = start ? start : card.offset();
-  card.css({position: 'absolute', ...src});
+  card.css({position: 'absolute', 'margin-left': '0', ...src});
   card.detach();
   $('body').append(card);
   let dest = $('#last-card').offset();

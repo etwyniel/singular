@@ -9,11 +9,17 @@
     <link rel="stylesheet" href="/bulma.min.css"></link>
     <title>Singular</title>
     <style>
+      #last-card {
+        margin-left: 0;
+      }
+
       .playing-card {
         position: relative;
         transition-property: top, left, position, opacity;
         transition-duration: 0.3s;
         width: 3rem;
+        height: 4rem;
+        font-size: 1.3rem;
       }
 
       #username-form {
@@ -43,6 +49,19 @@
       }
 
       @media screen and (min-width:1024px) {
+          .playing-card {
+              margin-left: -1rem;
+              box-shadow: -0.2rem 0rem 5px rgba(0, 0, 0, 0.5);
+          }
+
+          .playing-card:hover {
+              z-index: 100;
+          }
+
+          #hand {
+              padding-left: 1rem;
+          }
+
           #sidebar {
               background-color: #eeeeee;
               padding: 1rem;
