@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js">
+    </script>
+    <link rel="stylesheet" href="/bulma.min.css"></link>
+    <title>Singular</title>
+  </head>
+  <body>
+    <div class="section">
+      <div class="container">
+        <div class="title">
+          Public lobbies
+        </div>
+        <span class="is-loading"></span>
+        <div id="lobby-list">
+        </div>
+      </div>
+    </div>
+    <script type="text/javascript">
+      $(function() {
+        $.get('/lobbies.json', function (lobbies) {
+          console.log(lobbies);
+          if (lobbies.length == 0) {
+            $('#lobby-list').text('No public lobbies');
+            return;
+          }
+          let list = $('<li></li>');
+          for (let {code, name, player_count} of lobbies) {
+            let players = player_count == 1 ? "player" : "players";
+            list.append($(`<a href="/g/${code}">${name} (${player_count} ${players})</a>`));
+          }
+          $('#lobby-list').append(list);
+        });
+      });
+    </script>
+  </body>
+</html>
