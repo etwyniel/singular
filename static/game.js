@@ -5,6 +5,10 @@ async function run() {
   window.Color = Color;
 }
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 const code = window.location.pathname.replace("/g/", "");
 const host_start_message = `
 <p>Press Start when all the players are here</p>
@@ -43,6 +47,147 @@ function card_to_class(card, last) {
   }
 }
 
+async function handleMessage(msg) {
+  var msg = JSON.parse(msg.data);
+  switch (msg.type) {
+    case "GameInProgress":
+      $('#connect-error')
+        .removeClass('is-hidden')
+        .text('Game is already in progress');
+      $('#username-input').attr('disabled', false);
+      $('#connect').attr('disabled', false);
+      return;
+    case "InitData":
+      my_id = msg.data.id;
+      my_role = msg.data.role;
+      player = new Player(username, msg.data.id);
+      game = new Game(player, msg.data.role == "Host");
+      console.log("my role: " + my_role);
+      $('#username-form').hide();
+      $('#main-content')
+        .show()
+        .attr('style', 'display: flex;');
+      msg.data.players.forEach(p => {
+        $('#player-list').append($(`<span class="panel-block">${p.name}</span>`));
+        players.push(p)
+        game.add_player(new Player(p.name, p.id));
+      });
+      if (my_role == "Host") {
+        $('#public-form').show();
+        $('#start-game').show().attr('disabled', false);
+        $('#message').show().html(host_start_message);
+      } else {
+        $('#message').show().text('Waiting for the host to start the game...');
+      }
+      break;
+    case "PlayerJoined": {
+      const { name, id } = msg.data;
+      players.push({ name, id });
+      game.add_player(new Player(name, id));
+      $('#player-list').append($(`<span class="panel-block">${name}</span>`));
+      if (my_role == "Host" && players.length > 1) {
+        $('#start-game').attr('disabled', false);
+      }
+      break;
+    }
+    case "PlayerLeft": {
+      const {id} = msg.data;
+      game.remove_player(id);
+      break;
+    }
+    case "ChatMessage":
+      var sender = players.find(p => p.id == msg.data.id);
+      let chat = document.getElementById("chat");
+      var isScrolledToBottom = chat.scrollHeight - chat.clientHeight <= chat.scrollTop + 1;
+      $(chat).append($(`<p>${sender.name}: ${msg.data.msg}</p>`));
+      if (isScrolledToBottom)
+        chat.scrollTop = chat.scrollHeight;
+      break;
+    case "GameStart":
+      game.handle_event(msg.data);
+      $('#start-game').hide();
+      $('#public-form').hide();
+      $('#game-content').show();
+      $('#message').hide();
+      if (my_role == "Host") {
+        started = false;
+        deal(7 * game.players.length);
+      }
+      break;
+    case "Reset":
+      game.reset();
+      $('#reset-game').hide();
+      if (my_role == "Host") {
+        $('#public-form').show();
+        $('#start-game').show();
+        $('#message').show().html(host_start_message);
+      } else {
+        $('#message').show().text('Waiting for the host to start the game...');
+      }
+      break;
+    case "ToHost":
+      if (my_role != "Host") break;
+      if (msg.data == "DrawRequest") {
+        var deal_event = game.deal_event();
+        conn.send(JSON.stringify({type: "HostEvent", data: deal_event}));
+        var response_event = game.draw_response();
+        conn.send(JSON.stringify({type: "FromHost", data: {id: game.current_player, msg: response_event}}));
+      }
+      break;
+    case "FromHost":
+      game.handle_host_event(msg.data.msg);
+      const {DrawResponse} = msg.data.msg;
+      if (DrawResponse) {
+        update();
+        let last = $('#hand').children().last();
+        let dest = last.position();
+        last.css({position: 'absolute', ...$('#draw-pile').position()});
+        await sleep(20);
+        last.css(dest);
+        await sleep(300);
+        update();
+        return;
+      }
+      break;
+    case "HostEvent":
+      game.handle_host_event(msg.data);
+      const {Deal} = msg.data;
+      if (Deal && Deal.player != my_id) {
+        var count = Deal.count;
+        for (var i = 0; i < Deal.count; i++) {
+          let card = $('<span class="button is-dark playing-card">?</span>');
+          $('body').append(card);
+          card.css({position: 'absolute', ...$('#draw-pile').offset()});
+          card.css({opacity: 0, ...$('#player-' + Deal.player).offset()});
+          setTimeout(() => card.remove(), 300);
+          await sleep(100);
+        }
+      }
+      break;
+    case "GameEvent":
+      var res = game.handle_event(msg.data);
+      if (msg.data.hasOwnProperty("PlayCard")) {
+        var ev = msg.data.PlayCard;
+        if (ev.player != my_id) {
+          try_play(fake_card(new Card(ev.card)), $('#player-' + ev.player).offset());
+        }
+        await sleep(200);
+        update();
+        if (res == PlayResult.GameOver) {
+          var winner = players.find(p => p.id == game.current_player);
+          $('#game-content').hide();
+          $('#message').show().text(winner.name + ' wins!');
+          if (my_role == "Host") {
+            $('#reset-game').show().attr('disabled', false);
+          }
+        }
+        return;
+      }
+      break;
+  }
+  update();
+}
+
 function connect(name) {
   var wsUri = (window.location.protocol == 'https:'&&'wss://'||'ws://') + window.location.host + '/ws/' + code;
   conn = new WebSocket(wsUri);
@@ -53,143 +198,7 @@ function connect(name) {
   conn.onerror = e => {
     console.log(e);
   };
-  conn.onmessage = function(msg) {
-    msg = JSON.parse(msg.data);
-    switch (msg.type) {
-      case "GameInProgress":
-        $('#connect-error')
-          .removeClass('is-hidden')
-          .text('Game is already in progress');
-        $('#username-input').attr('disabled', false);
-        $('#connect').attr('disabled', false);
-        return;
-      case "InitData":
-        my_id = msg.data.id;
-        my_role = msg.data.role;
-        player = new Player(username, msg.data.id);
-        game = new Game(player, msg.data.role == "Host");
-        console.log("my role: " + my_role);
-        $('#username-form').hide();
-        $('#main-content')
-          .show()
-          .attr('style', 'display: flex;');
-        msg.data.players.forEach(p => {
-          $('#player-list').append($(`<span class="panel-block">${p.name}</span>`));
-          players.push(p)
-          game.add_player(new Player(p.name, p.id));
-        });
-        if (my_role == "Host") {
-          $('#start-game').show().attr('disabled', false);
-          $('#message').show().html(host_start_message);
-        } else {
-          $('#message').show().text('Waiting for the host to start the game...');
-        }
-        break;
-      case "PlayerJoined": {
-        const { name, id } = msg.data;
-        players.push({ name, id });
-        game.add_player(new Player(name, id));
-        $('#player-list').append($(`<span class="panel-block">${name}</span>`));
-        if (my_role == "Host" && players.length > 1) {
-          $('#start-game').attr('disabled', false);
-        }
-        break;
-      }
-      case "PlayerLeft": {
-        const {id} = msg.data;
-        game.remove_player(id);
-        break;
-      }
-      case "ChatMessage":
-        var sender = players.find(p => p.id == msg.data.id);
-        let chat = document.getElementById("chat");
-        var isScrolledToBottom = chat.scrollHeight - chat.clientHeight <= chat.scrollTop + 1;
-        $(chat).append($(`<p>${sender.name}: ${msg.data.msg}</p>`));
-        if (isScrolledToBottom)
-          chat.scrollTop = chat.scrollHeight;
-        break;
-      case "GameStart":
-        game.handle_event(msg.data);
-        $('#start-game').hide();
-        $('#game-content').show();
-        $('#message').hide();
-        if (my_role == "Host") {
-          started = false;
-          deal(7 * game.players.length);
-        }
-        break;
-      case "Reset":
-        game.reset();
-        $('#reset-game').hide();
-        if (my_role == "Host") {
-          $('#start-game').show();
-          $('#message').show().html(host_start_message);
-        } else {
-          $('#message').show().text('Waiting for the host to start the game...');
-        }
-        break;
-      case "ToHost":
-        if (my_role != "Host") break;
-        if (msg.data == "DrawRequest") {
-          var deal_event = game.deal_event();
-          conn.send(JSON.stringify({type: "HostEvent", data: deal_event}));
-          var response_event = game.draw_response();
-          conn.send(JSON.stringify({type: "FromHost", data: {id: game.current_player, msg: response_event}}));
-        }
-        break;
-      case "FromHost":
-        game.handle_host_event(msg.data.msg);
-        const {DrawResponse} = msg.data.msg;
-        if (DrawResponse) {
-          update();
-          let last = $('#hand').children().last();
-          let dest = last.position();
-          last.css({position: 'absolute', ...$('#draw-pile').position()});
-          setTimeout(() => last.css(dest), 20);
-          setTimeout(update, 300)
-          return;
-        }
-        break;
-      case "HostEvent":
-        game.handle_host_event(msg.data);
-        const {Deal} = msg.data;
-        if (Deal && Deal.player != my_id) {
-          var count = Deal.count;
-          var dealCard = function() {
-            let card = $('<span class="button is-dark playing-card">?</span>');
-            $('body').append(card);
-            card.css({position: 'absolute', ...$('#draw-pile').offset()});
-            card.css({opacity: 0, ...$('#player-' + Deal.player).offset()});
-            setTimeout(() => card.remove(), 300);
-            if (--count > 0) setTimeout(dealCard, 100);
-          };
-          setTimeout(dealCard, 100);
-        }
-        break;
-      case "GameEvent":
-        var res = game.handle_event(msg.data);
-        if (msg.data.hasOwnProperty("PlayCard")) {
-          var ev = msg.data.PlayCard;
-          if (ev.player != my_id) {
-            try_play(fake_card(new Card(ev.card)), $('#player-' + ev.player).offset());
-          }
-          setTimeout(() => {
-            update();
-            if (res == PlayResult.GameOver) {
-              var winner = players.find(p => p.id == game.current_player);
-              $('#game-content').hide();
-              $('#message').show().text(winner.name + ' wins!');
-              if (my_role == "Host") {
-                $('#reset-game').show().attr('disabled', false);
-              }
-            }
-          }, 200);
-          return;
-        }
-        break;
-    }
-    update();
-  };
+  conn.onmessage = handleMessage;
 }
 
 function deal(count) {
@@ -286,8 +295,8 @@ function card_contents(card) {
 }
 
 function fake_card(card) {
-    let colorClass = card_to_class(card, true);
-    return $(`<span class="button ${colorClass} playing-card">${card_contents(card)}</span>`);
+  let colorClass = card_to_class(card, true);
+  return $(`<span class="button ${colorClass} playing-card">${card_contents(card)}</span>`);
 }
 
 function display_draw_button() {
@@ -314,6 +323,8 @@ function display_players() {
 }
 
 function update() {
+  if (!game)
+    return;
   display_hand();
   let contents = card_contents(game.last);
   $('#last-card')
