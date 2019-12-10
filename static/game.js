@@ -380,3 +380,6 @@ $(function() {
 $(".modal-background").click(function() {$(this).parent().removeClass("is-active");});
 $(".modal-close").click(function() {$(this).parent().removeClass("is-active");});
 $('.spoiler').click(function() {$(this).toggleClass('is-active')});
+$('#public-checkbox').change(function() {
+  conn.send(JSON.stringify({type: 'SetPublic', data: $(this).prop('checked')}));
+});
