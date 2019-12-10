@@ -180,12 +180,16 @@
         <div class="section" id="main-section" style="">
           <div class="container">
             <div id="message" class="notification" hidden></div>
-            <button class="button is-success is-large" id="start-game" disabled style="display: none;">Start</button>
-              <label class="checkbox is-size-4" id="public-form" style="display: none;">
-                Make public
-                <input type="checkbox" id="public-checkbox">
-              </label>
-            <button class="button is-link is-large" id="reset-game" disabled style="display: none;">Reset</button>
+            <div class="level">
+              <div class="level-left">
+                <button class="level-item button is-success is-large" id="start-game" disabled style="display: none;">Start</button>
+                <button class="level-item button is-link is-large" id="reset-game" disabled style="display: none;">Reset</button>
+                <label class="level-item checkbox is-size-4" id="public-form" style="display: none;">
+                  <input type="checkbox" id="public-checkbox">
+                  Make public
+                </label>
+              </div>
+            </div>
           </div>
           <div id="game-content" hidden style="width: 100%; padding-left: 1rem;">
             <div class="level is-mobile">
