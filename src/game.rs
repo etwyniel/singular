@@ -92,6 +92,7 @@ impl Game {
         self.discard.clear();
         self.last = self.draw.pop().unwrap();
         self.current_player = 0;
+        self.direction = Direction::Clockwise;
     }
 
     #[wasm_bindgen(getter)]

@@ -6,7 +6,6 @@ mod card;
 mod game;
 
 use wasm_bindgen::prelude::*;
-use game::Game;
 
 #[wasm_bindgen]
 extern {
