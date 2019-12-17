@@ -1,6 +1,8 @@
 use rand::Rng;
 use wasm_bindgen::prelude::*;
 use std::fmt::{Display, Formatter, self};
+use std::convert::TryFrom;
+use std::str::FromStr;
 use serde_derive::{Deserialize, Serialize};
 
 #[wasm_bindgen]
@@ -11,6 +13,32 @@ pub enum Color {
     Green,
     Yellow,
     Blue,
+}
+
+use Color::*;
+
+impl Into<char> for Color {
+    fn into(self) -> char {
+        match self {
+            Red => 'R',
+            Green => 'G',
+            Yellow => 'Y',
+            Blue => 'B',
+        }
+    }
+}
+
+impl TryFrom<char> for Color {
+    type Error = ();
+    fn try_from(c: char) -> Result<Self, ()> {
+        Ok(match c {
+            'R' => Red,
+            'G' => Green,
+            'Y' => Yellow,
+            'B' => Blue,
+            _ => return Err(()),
+        })
+    }
 }
 
 impl Color {
@@ -48,6 +76,46 @@ pub enum CardType {
 }
 
 use CardType::*;
+
+impl Into<char> for CardType {
+    fn into(self) -> char {
+        if (self as u8) < 10 {
+            return (b'0' + self as u8) as char;
+        }
+        match self {
+            PlusTwo => '+',
+            Skip => 'S',
+            Reverse => 'R',
+            Wild => '*',
+            PlusFour => 'X',
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl TryFrom<char> for CardType {
+    type Error = ();
+    fn try_from(c: char) -> Result<Self, ()> {
+        Ok(match c {
+            '0' => N0,
+            '1' => N1,
+            '2' => N2,
+            '3' => N3,
+            '4' => N4,
+            '5' => N5,
+            '6' => N6,
+            '7' => N7,
+            '8' => N8,
+            '9' => N9,
+            '+' => PlusTwo,
+            'S' => Skip,
+            'R' => Reverse,
+            '*' => Wild,
+            'X' => PlusFour,
+            _ => return Err(()),
+        })
+    }
+}
 
 impl CardType {
     pub fn compatible_with(&self, last: CardType) -> bool {
@@ -116,9 +184,45 @@ impl CardType {
 
 #[wasm_bindgen]
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Deserialize, Serialize)]
+#[serde(try_from = "&str", into = "String")]
 pub struct Card {
     ty: CardType,
     pub(crate) color: Color,
+}
+
+impl Into<String> for Card {
+    fn into(self) -> String {
+        let mut s = String::with_capacity(2);
+        let color: char = self.color.into();
+        let ty: char = self.ty.into();
+        s.push(color);
+        s.push(ty);
+        s
+    }
+}
+
+impl FromStr for Card {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Card, ()> {
+        if s.len() != 2 {
+            return Err(());
+        }
+        match &s.chars().take(2).collect::<Vec<_>>()[0..2] {
+            [color_c, ty_c] => {
+                let color = Color::try_from(*color_c)?;
+                let ty = CardType::try_from(*ty_c)?;
+                Ok(Card{ ty, color })
+            }
+            _ => Err(()),
+        }
+    }
+}
+
+impl<'a> TryFrom<&'a str> for Card {
+    type Error = &'static str;
+    fn try_from(s: &str) -> Result<Card, &'static str> {
+        Card::from_str(s).map_err(|_| "Invalid card")
+    }
 }
 
 impl Card {
@@ -193,7 +297,6 @@ impl Display for Card {
 
 /// Builds a sorted deck
 pub fn build_deck() -> Vec<Card> {
-    use Color::*;
     use CardType::*;
     let mut deck = Vec::with_capacity(108);
     for color in vec![Red, Green, Yellow, Blue] {
@@ -223,10 +326,4 @@ pub fn build_deck() -> Vec<Card> {
         deck.push(Card { ty: PlusFour, color: Red });
     }
     deck
-}
-
-#[test]
-fn compatible() {
-    use Color::*;
-    // assert!(Wild.compatible_with(Number(2, Red), Red));
 }

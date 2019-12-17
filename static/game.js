@@ -49,141 +49,145 @@ function card_to_class(card, last) {
 
 async function handleMessage(msg) {
   var msg = JSON.parse(msg.data);
-  switch (msg.type) {
-    case "GameInProgress":
-      $('#connect-error')
-        .removeClass('is-hidden')
-        .text('Game is already in progress');
-      $('#username-input').attr('disabled', false);
-      $('#connect').attr('disabled', false);
-      return;
-    case "InitData":
-      my_id = msg.data.id;
-      my_role = msg.data.role;
-      player = new Player(username, msg.data.id);
-      game = new Game(player, msg.data.role == "Host");
-      console.log("my role: " + my_role);
-      $('#username-form').hide();
-      $('#main-content')
-        .show()
-        .attr('style', 'display: flex;');
-      msg.data.players.forEach(p => {
-        $('#player-list').append($(`<span class="panel-block">${p.name}</span>`));
-        players.push(p)
-        game.add_player(new Player(p.name, p.id));
-      });
-      if (my_role == "Host") {
-        $('#public-form').show();
-        $('#start-game').show().attr('disabled', false);
-        $('#message').show().html(host_start_message);
-      } else {
-        $('#message').show().text('Waiting for the host to start the game...');
-      }
-      break;
-    case "PlayerJoined": {
-      const { name, id } = msg.data;
-      players.push({ name, id });
-      game.add_player(new Player(name, id));
-      $('#player-list').append($(`<span class="panel-block">${name}</span>`));
-      if (my_role == "Host" && players.length > 1) {
-        $('#start-game').attr('disabled', false);
-      }
-      break;
+  if (msg == "Reset") {
+    game.reset();
+    $('#reset-game').hide();
+    if (my_role == "Host") {
+      $('#public-form').show();
+      $('#start-game').show();
+      $('#message').show().html(host_start_message);
+    } else {
+      $('#message').show().text('Waiting for the host to start the game...');
     }
-    case "PlayerLeft": {
-      const {id} = msg.data;
-      game.remove_player(id);
-      break;
-    }
-    case "ChatMessage":
-      var sender = players.find(p => p.id == msg.data.id);
-      let chat = document.getElementById("chat");
-      var isScrolledToBottom = chat.scrollHeight - chat.clientHeight <= chat.scrollTop + 1;
-      $(chat).append($(`<p>${sender.name}: ${msg.data.msg}</p>`));
-      if (isScrolledToBottom)
-        chat.scrollTop = chat.scrollHeight;
-      break;
-    case "GameStart":
-      game.handle_event(msg.data);
-      $('#start-game').hide();
-      $('#public-form').hide();
-      $('#game-content').show();
-      $('#message').hide();
-      if (my_role == "Host") {
-        started = false;
-        deal(7 * game.players.length);
-      }
-      break;
-    case "Reset":
-      game.reset();
-      $('#reset-game').hide();
-      if (my_role == "Host") {
-        $('#public-form').show();
-        $('#start-game').show();
-        $('#message').show().html(host_start_message);
-      } else {
-        $('#message').show().text('Waiting for the host to start the game...');
-      }
-      break;
-    case "ToHost":
-      if (my_role != "Host") break;
-      if (msg.data == "DrawRequest") {
-        var deal_event = game.deal_event();
-        conn.send(JSON.stringify({type: "HostEvent", data: deal_event}));
-        var response_event = game.draw_response();
-        conn.send(JSON.stringify({type: "FromHost", data: {id: game.current_player, msg: response_event}}));
-      }
-      break;
-    case "FromHost":
-      game.handle_host_event(msg.data.msg);
-      const {DrawResponse} = msg.data.msg;
-      if (DrawResponse) {
-        update();
-        let last = $('#hand').children().last();
-        let dest = last.position();
-        last.css({position: 'absolute', ...$('#draw-pile').position()});
-        await sleep(20);
-        last.css(dest);
-        await sleep(300);
-        update();
+    update();
+    return;
+  }
+  for (let [type, data] of Object.entries(msg)) {
+    switch (type) {
+      case "GameInProgress":
+        $('#connect-error')
+          .removeClass('is-hidden')
+          .text('Game is already in progress');
+        $('#username-input').attr('disabled', false);
+        $('#connect').attr('disabled', false);
         return;
-      }
-      break;
-    case "HostEvent":
-      game.handle_host_event(msg.data);
-      const {Deal} = msg.data;
-      if (Deal && Deal.player != my_id) {
-        var count = Deal.count;
-        for (var i = 0; i < Deal.count; i++) {
-          let card = $('<span class="button is-dark playing-card">?</span>');
-          $('body').append(card);
-          card.css({position: 'absolute', ...$('#draw-pile').offset()});
-          card.css({opacity: 0, ...$('#player-' + Deal.player).offset()});
-          setTimeout(() => card.remove(), 300);
-          await sleep(100);
+      case "InitData":
+        my_id = data.id;
+        my_role = data.role;
+        player = new Player(username, data.id);
+        game = new Game(player, data.role == "Host");
+        console.log("my role: " + my_role);
+        $('#username-form').hide();
+        $('#main-content')
+          .show()
+          .attr('style', 'display: flex;');
+        data.players.forEach(p => {
+          $('#player-list').append($(`<span class="panel-block">${p.name}</span>`));
+          players.push(p)
+          game.add_player(new Player(p.name, p.id));
+        });
+        if (my_role == "Host") {
+          $('#public-form').show();
+          $('#start-game').show().attr('disabled', false);
+          $('#message').show().html(host_start_message);
+        } else {
+          $('#message').show().text('Waiting for the host to start the game...');
         }
-      }
-      break;
-    case "GameEvent":
-      var res = game.handle_event(msg.data);
-      if (msg.data.hasOwnProperty("PlayCard")) {
-        var ev = msg.data.PlayCard;
-        if (ev.player != my_id) {
-          try_play(fake_card(new Card(ev.card)), $('#player-' + ev.player).offset());
+        break;
+      case "PlayerJoined": {
+        const { name, id } = data;
+        players.push({ name, id });
+        game.add_player(new Player(name, id));
+        $('#player-list').append($(`<span class="panel-block">${name}</span>`));
+        if (my_role == "Host" && players.length > 1) {
+          $('#start-game').attr('disabled', false);
         }
-        await sleep(200);
-        update();
-        if (res == PlayResult.GameOver) {
-          var winner = players.find(p => p.id == game.current_player);
-          $('#game-content').hide();
-          $('#message').show().text(winner.name + ' wins!');
-          if (my_role == "Host") {
-            $('#reset-game').show().attr('disabled', false);
+        break;
+      }
+      case "PlayerLeft": {
+        const {id} = data;
+        game.remove_player(id);
+        break;
+      }
+      case "ChatMessage":
+        var sender = players.find(p => p.id == data.id);
+        let chat = document.getElementById("chat");
+        var isScrolledToBottom = chat.scrollHeight - chat.clientHeight <= chat.scrollTop + 1;
+        $(chat).append($(`<p>${sender.name}: ${data.msg}</p>`));
+        if (isScrolledToBottom)
+          chat.scrollTop = chat.scrollHeight;
+        break;
+      case "GameStart":
+        game.handle_event(data);
+        $('#start-game').hide();
+        $('#public-form').hide();
+        $('#game-content').show();
+        $('#message').hide();
+        if (my_role == "Host") {
+          started = false;
+          deal(7 * game.players.length);
+        }
+        break;
+      case "ToHost":
+        if (my_role != "Host") break;
+        if (data == "DrawRequest") {
+          var deal_event = game.deal_event();
+          conn.send(JSON.stringify({HostEvent: deal_event}));
+          var response_event = game.draw_response();
+          conn.send(JSON.stringify({FromHost: {id: game.current_player, msg: response_event}}));
+        }
+        break;
+      case "FromHost":
+        game.handle_host_event(data.msg);
+        const {DrawResponse} = data.msg;
+        if (DrawResponse) {
+          update();
+          let last = $('#hand').children().last();
+          let dest = last.position();
+          last.css({position: 'absolute', ...$('#draw-pile').position()});
+          await sleep(20);
+          last.css(dest);
+          await sleep(300);
+          update();
+          return;
+        }
+        break;
+      case "HostEvent":
+        game.handle_host_event(data);
+        const {Deal} = data;
+        if (Deal && Deal.player != my_id) {
+          var count = Deal.count;
+          for (var i = 0; i < Deal.count; i++) {
+            let card = $('<span class="button is-dark playing-card">?</span>');
+            $('body').append(card);
+            card.css({position: 'absolute', ...$('#draw-pile').offset()});
+            card.css({opacity: 0, ...$('#player-' + Deal.player).offset()});
+            setTimeout(() => card.remove(), 300);
+            await sleep(100);
           }
         }
-        return;
-      }
-      break;
+        break;
+      case "GameEvent":
+        var res = game.handle_event(data);
+        if (data.hasOwnProperty("PlayCard")) {
+          var ev = data.PlayCard;
+          if (ev.player != my_id) {
+            try_play(fake_card(new Card(ev.card)), $('#player-' + ev.player).offset());
+          }
+          await sleep(200);
+          update();
+          if (res == PlayResult.GameOver) {
+            var winner = players.find(p => p.id == game.current_player);
+            $('#game-content').hide();
+            $('#message').show().text(winner.name + ' wins!');
+            if (my_role == "Host") {
+              $('#reset-game').show().attr('disabled', false);
+            }
+          }
+          return;
+        }
+        break;
+    }
   }
   update();
 }
@@ -193,7 +197,7 @@ function connect(name) {
   conn = new WebSocket(wsUri);
   conn.onopen = function() {
     console.log("connected");
-    conn.send(JSON.stringify({ type: "PlayerJoined", data: { name } }));
+    conn.send(JSON.stringify({ PlayerJoined: { name } }));
   };
   conn.onerror = e => {
     console.log(e);
@@ -208,9 +212,9 @@ function deal(count) {
     return;
   }
   var deal_event = game.deal_event();
-  conn.send(JSON.stringify({type: "HostEvent", data: deal_event}));
+  conn.send(JSON.stringify({HostEvent: deal_event}));
   var response_event = game.draw_response();
-  conn.send(JSON.stringify({type: "FromHost", data: {id: game.current_player, msg: response_event}}));
+  conn.send(JSON.stringify({FromHost: {id: game.current_player, msg: response_event}}));
   game.end_turn();
   setTimeout(() => deal(count - 1), 100);
 }
@@ -221,7 +225,7 @@ function play_card(i, button) {
   $('#color-prompt')
     .empty();
   var card = new Card(game.own_hand()[i]);
-  conn.send(JSON.stringify({type: "GameEvent", data: game.play_card_event(i)}));
+  conn.send(JSON.stringify({GameEvent: game.play_card_event(i)}));
 }
 
 function play_wild(i, color, button) {
@@ -358,18 +362,18 @@ $(function() {
     var input = $('#chat-input');
     var msg = input.val();
     input.val('');
-    conn.send(JSON.stringify({type: "ChatMessage", data: {msg}}));
+    conn.send(JSON.stringify({ChatMessage: {msg}}));
   };
 
   $('#start-game').click(() => {
-    conn.send(JSON.stringify({type: "GameStart", data: game.init_event()}));
+    conn.send(JSON.stringify({GameStart: game.init_event()}));
   });
   $('#reset-game').click(() => {
-    conn.send(JSON.stringify({type: "Reset"}));
+    conn.send(JSON.stringify("Reset"));
   });
 
   $('#draw-button').click(() => {
-    conn.send(JSON.stringify({type: "ToHost", data: game.draw_request()}));
+    conn.send(JSON.stringify({ToHost: game.draw_request()}));
   });
 
   window.play_card = play_card;
@@ -381,5 +385,5 @@ $(".modal-background").click(function() {$(this).parent().removeClass("is-active
 $(".modal-close").click(function() {$(this).parent().removeClass("is-active");});
 $('.spoiler').click(function() {$(this).toggleClass('is-active')});
 $('#public-checkbox').change(function() {
-  conn.send(JSON.stringify({type: 'SetPublic', data: $(this).prop('checked')}));
+  conn.send(JSON.stringify({SetPublic: $(this).prop('checked')}));
 });

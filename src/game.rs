@@ -89,6 +89,7 @@ impl Game {
         }
         self.draw = build_deck();
         self.draw.shuffle(&mut self.rng);
+        self.draw_count = None;
         self.discard.clear();
         self.last = self.draw.pop().unwrap();
         self.current_player = 0;
