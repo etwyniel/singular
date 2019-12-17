@@ -142,12 +142,23 @@ async function handleMessage(msg) {
         const {DrawResponse} = data.msg;
         if (DrawResponse) {
           update();
-          let last = $('#hand').children().last();
-          let dest = last.position();
-          last.css({position: 'absolute', ...$('#draw-pile').position()});
-          await sleep(20);
-          last.css(dest);
-          await sleep(300);
+          var hand = $('#hand').children();
+          let newCards = hand.slice(-DrawResponse.length);
+          let positions = newCards.map((_, c) => $(c).position());
+          let drawPile = $('#draw-pile');
+          newCards.hide();
+          for (const i in positions) {
+            if (+i != i)
+              continue;
+            let card = $(newCards[i]);
+            let dest = positions[i];
+            card.show();
+            card.css({position: 'absolute', ...drawPile.position()});
+            await sleep(20);
+            card.css(dest);
+            await sleep(100);
+          }
+          await sleep(200);
           update();
           return;
         }
