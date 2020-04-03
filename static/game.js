@@ -9,6 +9,10 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+window.onbeforeunload = function(){
+  return 'Are you sure you want to leave?';
+};
+
 const code = window.location.pathname.replace("/g/", "");
 const host_start_message = `
 <p>Press Start when all the players are here</p>
