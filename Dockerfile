@@ -5,12 +5,10 @@ WORKDIR /usr/src/app
 COPY Cargo.lock .
 COPY Cargo.toml .
 RUN mkdir .cargo && mkdir src && touch src/lib.rs
-RUN cargo vendor > .cargo/config
 RUN cargo build --target wasm32-unknown-unknown --release
 
 COPY ./src src
 RUN touch src/lib.rs
-COPY ./static static
 
 RUN cargo build --target wasm32-unknown-unknown --release
 RUN wasm-bindgen --target web --no-typescript --out-dir static target/wasm32-unknown-unknown/release/singular.wasm
@@ -25,6 +23,6 @@ RUN echo $CACHE_DATE && cd lobbier && git pull && cargo install --path . --force
 FROM debian:stable-slim
 
 COPY --from=lobbier-build /usr/local/cargo/bin/lobbier /bin
-COPY --from=wasm-build /usr/src/app/static static
+COPY ./static static
 
 CMD ["lobbier"]
